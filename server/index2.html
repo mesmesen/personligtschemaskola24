@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skola24 Timetable Fetcher</title>
+</head>
+<body>
+    <h1>Skola24 Timetable Fetcher</h1>
+    <form id="initialForm">
+        <label for="hostName">Kommun (((BAJS))) (Host Name):</label>
+        <input type="text" id="hostName" name="hostName" required><br><br>
+
+        <label for="schemaID">Schema ID:</label>
+        <input type="text" id="schemaID" name="schemaID" required><br><br>
+
+        <button type="submit">Fetch Schools</button>
+    </form>
+
+    <div id="schoolSelection" style="display:none;">
+        <h2>Select a School</h2>
+        <select id="schoolsDropdown"></select>
+        <button id="fetchTimetable">Get Timetable</button>
+    </div>
+
+    <div id="timetable" style="display:none;">
+        <h2>Timetable</h2>
+        <pre id="timetableData"></pre>
+    </div>
+
+    <script>
+        document.getElementById("initialForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const hostName = document.getElementById("hostName").value;
+        const schemaID = document.getElementById("schemaID").value;
+
+        const response = await fetch("/api/timetable", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hostName, schemaID })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            const schoolsDropdown = document.getElementById("schoolsDropdown");
+            schoolsDropdown.innerHTML = '';
+
+            data.forEach(school => {
+                const option = document.createElement("option");
+                option.value = school.unitGuid;
+                option.textContent = school.unitName || "Unnamed School"; // Use unitId instead of unitName
+                schoolsDropdown.appendChild(option);
+                console.log("Received data:", data);
+            });
+
+            document.getElementById("schoolSelection").style.display = "block";
+        } else {
+            alert(data.message);
+        }
+    });
+
+
+        document.getElementById("fetchTimetable").addEventListener("click", async () => {
+            const hostName = document.getElementById("hostName").value;
+            const schemaID = document.getElementById("schemaID").value;
+            const unitGuid = document.getElementById("schoolsDropdown").value;
+          
+
+            const response = await fetch("/api/timetable", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ hostName, schemaID, unitGuid })
+            });
+
+            const timetableData = await response.json();
+
+            if (response.ok) {
+                document.getElementById("timetableData").textContent = JSON.stringify(timetableData, null, 2);
+                document.getElementById("timetable").style.display = "block";
+            } else {
+                alert(timetableData.message);
+            }
+        });
+    </script>
+</body>
+</html>
