@@ -172,12 +172,12 @@ function skola_vald(schoolUnitGuid) {
 function spara_ny() {
     geNamn.style.display = "none";
     add_screen.style.display = "none";
-    let tillfällig_namn = namnVal.value;
+    let tillfällig_namn = namnVal.value; // Define the temporary name
     namnVal.value = "";
     saveHolder(tillfällig_namn);
 
     setTimeout(() => {
-        fetchTimetableDataAfterSave();
+        fetchTimetableDataAfterSave(tillfällig_namn); // Pass the name as a parameter
     }, 0);
 }
 
@@ -245,7 +245,26 @@ function displaySchools(schools) {
     });
 }
 
-// Function to create a new holder element
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Initialize holders from localStorage or as an empty array
 let holders = JSON.parse(localStorage.getItem('holders')) || [];
 let holderId = holders.length > 0 ? holders[holders.length - 1].id + 1 : 0; // Initialize holderId
 
@@ -314,40 +333,153 @@ function saveHolder(tillfällig_namn) {
     holders.push(newHolder);
     localStorage.setItem('holders', JSON.stringify(holders)); // Store in localStorage
     renderHolders(); // Re-render holders
+
+    // Fetch timetable data after saving
+    fetchTimetableDataAfterSave(tillfällig_namn);
 }
 
 // Render holders on page load
 document.addEventListener('DOMContentLoaded', renderHolders);
 
 // Fetch timetable data after saving
-async function fetchTimetableDataAfterSave() {
+async function fetchTimetableDataAfterSave(tillfällig_namn) {
     try {
-        const hostName = tillfällig_kommun; // Ensure this is set in kommun_vald()
-        const schemaID = salVald; // Use the correct schema ID value
-        const selectedUnitGuid = unitGuid; // Use the unitGuid set in skola_vald()
-
-        if (!hostName || !schemaID || !selectedUnitGuid) {
-            console.error('Required parameters are missing for fetching timetable data.');
-            alert('Required parameters are missing.');
-            return;
-        }
-
         const response = await fetch("https://different-jealous-silica.glitch.me/api/timetable", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hostName, schemaID, unitGuid: selectedUnitGuid })
+            body: JSON.stringify({ hostName: tillfällig_kommun, schemaID: salVald, unitGuid: unitGuid })
         });
 
-        fetchedTimetableData = await response.json(); // Save fetched data to the variable
-
-        if (response.ok) {
-            document.getElementById("timetableData").textContent = JSON.stringify(fetchedTimetableData, null, 2);
-            document.getElementById("timetable").style.display = "block";
-        } else {
-            alert(fetchedTimetableData.message);
+        if (!response.ok) {
+            const errorData = await response.json();
+            alert(errorData.message);
+            return;
         }
+
+        const timetableData = await response.json();
+        document.getElementById("timetableData").textContent = JSON.stringify(timetableData, null, 2);
+
+        // Update holders with timetable data and start countdowns
+        mapTimetableToHolder(timetableData, tillfällig_namn);
+        timetableData.forEach(lesson => startCountdown(lesson));
     } catch (error) {
         console.error("Error fetching timetable data:", error);
         alert("An error occurred while fetching timetable data.");
     }
 }
+
+// Update holder with timetable data
+function updateHolderWithLessonData(holder, lesson) {
+    holder.status = getLessonStatus(lesson);
+    holder.tid = lesson.timeStart;
+    holder.lärare = lesson.texts[1]; // Assuming this is the teacher
+    holder.ämne = lesson.texts[2]; // Assuming this is the subject
+    // Update local storage
+    localStorage.setItem('holders', JSON.stringify(holders));
+    renderHolders(); // Refresh display
+}
+
+// Map timetable data to holders
+function mapTimetableToHolder(timetableData, tillfällig_namn) {
+    const holder = holders.find(h => h.sal_namn === tillfällig_namn);
+    if (!holder) return;
+
+    // Find the closest future lesson
+    const closestLesson = findClosestLesson(timetableData);
+
+    if (closestLesson) {
+        updateHolderWithLessonData(holder, closestLesson);
+    } else {
+        console.error('No future lessons found.');
+    }
+}
+
+// Calculate and display lesson status
+function getLessonStatus(lesson) {
+    const now = new Date();
+    const currentTime = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+
+    const lessonStart = new Date(`1970-01-01T${lesson.timeStart}Z`);
+    const lessonEnd = new Date(`1970-01-01T${lesson.timeEnd}Z`);
+    const current = new Date(`1970-01-01T${currentTime}Z`);
+
+    if (current < lessonStart) {
+        return 'ledig'; // Lesson hasn't started yet
+    }
+    if (current >= lessonStart && current <= lessonEnd) {
+        return 'upptagen'; // Lesson is currently ongoing
+    }
+    return 'ledig'; // Lesson has ended or is not yet relevant
+}
+
+// Calculate time remaining for countdown
+function calculateTimeRemaining(endTime) {
+    const now = new Date();
+    const end = new Date(`1970-01-01T${endTime}Z`);
+    const timeDiff = end - now;
+    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    return { hours, minutes, seconds };
+}
+
+// Start countdown for a lesson
+function startCountdown(lesson) {
+    const countdownElement = document.getElementById(`countdown-${lesson.guidId}`);
+    if (!countdownElement) return; // Skip if the countdown element is not found
+
+    function updateCountdown() {
+        const { hours, minutes, seconds } = calculateTimeRemaining(lesson.timeEnd);
+        countdownElement.textContent = `${hours}h ${minutes}m ${seconds}s`;
+        if (hours <= 0 && minutes <= 0 && seconds <= 0) {
+            countdownElement.textContent = "Time's up!";
+            clearInterval(timerInterval);
+        }
+    }
+
+    updateCountdown(); // Initial call
+    const timerInterval = setInterval(updateCountdown, 1000); // Update every second
+}
+
+// Find the closest lesson
+function findClosestLesson(lessons) {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 (Sunday) - 6 (Saturday)
+    const currentTime = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+    
+    // Create an array to hold lessons for each day of the week
+    const lessonsByDay = Array.from({ length: 7 }, () => []);
+
+    // Organize lessons by day of the week
+    lessons.forEach(lesson => {
+        const dayIndex = lesson.dayOfWeekNumber - 1; // Adjust for 0-based index
+        lessonsByDay[dayIndex].push(lesson);
+    });
+
+    // Find the next upcoming lesson
+    for (let offset = 0; offset < 7; offset++) {
+        const dayIndex = (currentDay + offset) % 7;
+        const dayLessons = lessonsByDay[dayIndex];
+
+        // Sort lessons by start time for the current day
+        const sortedLessons = dayLessons.sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+
+        // Find the closest lesson for the current day
+        for (const lesson of sortedLessons) {
+            if (offset > 0 || lesson.timeStart > currentTime) {
+                return lesson;
+            }
+        }
+    }
+
+    // If no future lesson is found (shouldn't happen if data is correct)
+    return null;
+}
+
+// Example usage
+const lessons = [
+    // Define your lessons here...
+];
+
+const closestLesson = findClosestLesson(lessons);
+console.log(closestLesson);
