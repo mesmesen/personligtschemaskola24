@@ -372,8 +372,8 @@ async function fetchTimetableDataAfterSave(tillfällig_namn) {
 function updateHolderWithLessonData(holder, lesson) {
     holder.status = getLessonStatus(lesson);
     holder.tid = lesson.timeStart;
-    holder.lärare = lesson.texts[1]; // Assuming this is the teacher
-    holder.ämne = lesson.texts[2]; // Assuming this is the subject
+    holder.lärare = lesson.texts[0]; // Assuming this is the teacher
+    holder.ämne = lesson.texts[1]; // Assuming this is the subject
     // Update local storage
     localStorage.setItem('holders', JSON.stringify(holders));
     renderHolders(); // Refresh display
