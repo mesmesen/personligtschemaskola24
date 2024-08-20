@@ -374,6 +374,8 @@ function saveHolder(tillfällig_namn) {
 
 // Render holders on page load
 document.addEventListener('DOMContentLoaded', () => {
+    getLocalDayOfWeek()
+    getLocalTime()
     console.log('DOMContentLoaded event fired');
     holders.forEach(holder => {
         console.log(`Processing holder with name: ${holder.sal_namn}`);
@@ -568,3 +570,21 @@ async function fetchWithThrottle(tillfällig_namn) {
     lastFetchTime = now;
     await fetchTimetableDataAfterSave(tillfällig_namn);
 }
+
+
+
+function getLocalDayOfWeek() {
+    const today = new Date();
+    // getDay() returns 0 (Sunday) to 6 (Saturday)
+    return (today.getDay() + 6) % 7 + 1; // Adjust to 1 (Monday) to 7 (Sunday)
+}
+
+// Function to get the user's local time in "HH:MM:SS" format
+function getLocalTime() {
+    const today = new Date();
+    return today.toTimeString().split(' ')[0]; // "HH:MM:SS"
+}
+
+// Example usage
+console.log("Local Day of Week: " + getLocalDayOfWeek()); // Output: 1 to 7
+console.log("Local Time: " + getLocalTime()); // Output: "HH:MM:SS"
