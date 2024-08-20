@@ -12,7 +12,7 @@ document.getElementById("initialForm").addEventListener("submit", async (event) 
     const schemaID = document.getElementById("schemaID").value;
 
     try {
-        const response = await fetch("https://new-api-endpoint-url.com/api/timetable", {
+        const response = await fetch("https://different-jealous-silica.glitch.me/api/timetable", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ hostName, schemaID })
@@ -299,19 +299,24 @@ let holderId = holders.length > 0 ? holders[holders.length - 1].id + 1 : 0; // I
 
 // Function to create a new holder element
 function createHolderElement(holder) {
+    // Ensure the holder object has the expected properties
+    if (!holder) {
+        console.error('Holder is undefined');
+        return;
+    }
+
     const holderDiv = document.createElement('div');
     holderDiv.className = 'holder';
     holderDiv.dataset.id = holder.id; // Assign the holder's id to the dataset for easy reference
 
     holderDiv.innerHTML = `
         <p class="remove_sal" style="cursor: pointer;">X</p>
-        <p class="sal_namn">${holder.sal_namn}</p>
+        <p class="sal_namn">${holder.sal_namn || 'Unnamed Holder'}</p>
         <p class="status">${holder.status || 'Är ledig'}</p>
         <p class="countdown">00:00:00</p> <!-- Countdown element -->
         <p class="tid">${holder.tid || '00:00:00'}</p>
         <p class="lärare">${holder.lärare || 'JANNE'}</p>
         <p class="ämne">${holder.ämne || 'CAD'}</p>
-
     `;
 
     // Add click event listener to the remove button
@@ -319,6 +324,8 @@ function createHolderElement(holder) {
     removeButton.addEventListener('click', function() {
         removeHolder(holder.id); // Pass the id of the holder to remove
     });
+
+    logHolderInfo(holder); // Log the holder's info to the console
 
     return holderDiv;
 }
@@ -353,22 +360,26 @@ function saveHolder(tillfällig_namn) {
         return;
     }
 
+    // Create a new holder with default values
     const newHolder = {
         id: holderId++, // Unique identifier
         sal_namn: tillfällig_namn,
         hostName: tillfällig_kommun,
         schemaID: salVald,
         unitGuid: unitGuid,
-        status: 'Är ledig', // Default value, can be customized
-        tid: '00:00:00', // Default value, can be customized
-        lärare: 'JANNE', // Default value, can be customized
-        ämne: 'CAD' // Default value, can be customized
+        status: 'Är ledig', // Default value
+        tid: '00:00:00', // Default value
+        lärare: 'JANNE', // Default value
+        ämne: 'CAD', // Default value
+        lessonStartTime: '00:00:00', // Default value
+        lessonEndTime: '00:00:00', // Default value
+        lessonDayOfWeek: 1 // Default value (Monday)
     };
 
     holders.push(newHolder);
     localStorage.setItem('holders', JSON.stringify(holders)); // Store in localStorage
     renderHolders(); // Re-render holders
-    fetchTimetableDataAfterSave(newHolder); // Pass the holder object to fetch data
+    fetchTimetableDataAfterSave(newHolder.sal_namn); // Pass the holder name to fetch data
 }
 
 
@@ -440,6 +451,10 @@ function updateHolderWithLessonData(holder, lesson) {
     holder.tid = lesson.timeStart;
     holder.lärare = lesson.texts[0]; // Assuming this is the teacher
     holder.ämne = lesson.texts[1]; // Assuming this is the subject
+    holder.lessonStartTime = lesson.timeStart; // Save lesson start time
+    holder.lessonEndTime = lesson.timeEnd; // Save lesson end time
+    holder.lessonDayOfWeek = lesson.dayOfWeekNumber; // Save day of the week
+
     // Update local storage with the modified holder
     const holderIndex = holders.findIndex(h => h.id === holder.id);
     holders[holderIndex] = holder;
@@ -511,33 +526,33 @@ function startCountdown(lesson) {
 }
 
 // Find the closest lesson
+// Find the closest lesson
 function findClosestLesson(lessons) {
     const now = new Date();
     const currentDay = now.getDay(); // 0 (Sunday) - 6 (Saturday)
     const currentTime = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
-    
+
     // Create an array to hold lessons for each day of the week
     const lessonsByDay = Array.from({ length: 7 }, () => []);
 
     // Organize lessons by day of the week
     lessons.forEach(lesson => {
-        const dayIndex = lesson.dayOfWeekNumber - 1; // Adjust for 0-based index
+        const dayIndex = lesson.dayOfWeekNumber; // Adjust for 0-based index
         lessonsByDay[dayIndex].push(lesson);
     });
 
-    // Find the next upcoming lesson
-    for (let offset = 0; offset < 7; offset++) {
+    // Filter today's lessons to find the next one after the current time
+    let todaysLessons = lessonsByDay[currentDay].filter(lesson => lesson.timeStart > currentTime);
+    if (todaysLessons.length > 0) {
+        return todaysLessons.sort((a, b) => a.timeStart.localeCompare(b.timeStart))[0];
+    }
+
+    // If no lessons are left today, check the next available day
+    for (let offset = 1; offset < 7; offset++) {
         const dayIndex = (currentDay + offset) % 7;
         const dayLessons = lessonsByDay[dayIndex];
-
-        // Sort lessons by start time for the current day
-        const sortedLessons = dayLessons.sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-
-        // Find the closest lesson for the current day
-        for (const lesson of sortedLessons) {
-            if (offset > 0 || lesson.timeStart > currentTime) {
-                return lesson;
-            }
+        if (dayLessons.length > 0) {
+            return dayLessons.sort((a, b) => a.timeStart.localeCompare(b.timeStart))[0];
         }
     }
 
@@ -585,6 +600,73 @@ function getLocalTime() {
     return today.toTimeString().split(' ')[0]; // "HH:MM:SS"
 }
 
+// Function to convert time string to seconds since midnight
+function timeToSeconds(timeStr) {
+    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+    return hours * 3600 + minutes * 60 + seconds;
+}
+
+// Function to convert seconds to "HH:MM:SS" format with leading zeros
+function secondsToTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+// Function to log holder information and calculate time-related info
+function logHolderInfo(holder) {
+    const localDayOfWeek = getLocalDayOfWeek();
+    const localTime = getLocalTime();
+
+    console.log(`Holder Name: ${holder.sal_namn}`);
+    console.log(`Lesson Start Time: ${holder.lessonStartTime}`);
+    console.log(`Lesson End Time: ${holder.lessonEndTime}`);
+    console.log(`Lesson Day of Week: ${holder.lessonDayOfWeek}`);
+    console.log(`User's Local Day of Week: ${localDayOfWeek}`);
+    console.log(`User's Local Time: ${localTime}`);
+
+    const time1 = holder.lessonStartTime;
+    const time2 = holder.lessonEndTime;
+    const time3 = localTime;
+
+    const seconds1 = timeToSeconds(time1);
+    const seconds2 = timeToSeconds(time2);
+    const seconds3 = timeToSeconds(time3);
+
+    // Helper to convert day difference to seconds
+    function dayDifferenceInSeconds(day1, day2) {
+        return (day2 - day1) * 24 * 3600;
+    }
+
+    if (localDayOfWeek === holder.lessonDayOfWeek) {
+        if (seconds3 >= seconds1 && seconds3 <= seconds2) {
+            // Calculate time left until the lesson ends
+            const timeLeft = seconds2 - seconds3;
+            console.log(`Time left until the lesson ends: ${secondsToTime(timeLeft)}`);
+        } else if (seconds3 < seconds1) {
+            // Calculate time left until the lesson starts
+            const timeUntilStart = seconds1 - seconds3;
+            console.log(`Time left until the lesson starts: ${secondsToTime(timeUntilStart)}`);
+        }
+    } else if (localDayOfWeek < holder.lessonDayOfWeek) {
+        // Lesson starts on a future day
+        const timeUntilStart = (dayDifferenceInSeconds(localDayOfWeek, holder.lessonDayOfWeek)) + (seconds1 - seconds3);
+        console.log(`Time left until the lesson starts: ${secondsToTime(timeUntilStart)}`);
+    } else if (localDayOfWeek > holder.lessonDayOfWeek) {
+        // Lesson is on a past day
+        const timeSinceEnd = (dayDifferenceInSeconds(holder.lessonDayOfWeek, localDayOfWeek)) + (seconds3 - seconds2);
+        console.log(`Time since the lesson ended: ${secondsToTime(timeSinceEnd)}`);
+    } else {
+        console.log('The lesson is not within the current time frame.');
+    }
+}
+
 // Example usage
-console.log("Local Day of Week: " + getLocalDayOfWeek()); // Output: 1 to 7
-console.log("Local Time: " + getLocalTime()); // Output: "HH:MM:SS"
+const holder = {
+    sal_namn: "John Doe",
+    lessonStartTime: "03:40:36",
+    lessonEndTime: "13:33:42",
+    lessonDayOfWeek: 3 // Wednesday
+};
+logHolderInfo(holder);
