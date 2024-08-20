@@ -12,11 +12,11 @@ document.getElementById("initialForm").addEventListener("submit", async (event) 
     const schemaID = document.getElementById("schemaID").value;
 
     try {
-        const response = await fetch("https://different-jealous-silica.glitch.me/api/timetable", {
+        const response = await fetch("https://new-api-endpoint-url.com/api/timetable", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ hostName, schemaID })
-        });
+          });
 
         const data = await response.json();
 
@@ -126,9 +126,21 @@ document.getElementById("exit1").addEventListener("click", exit_1);
 document.getElementById("next1").addEventListener("click", next_1);
 document.getElementById("spara").addEventListener("click", () => {
     setTimeout(() => {
-        spara_ny();
+        spara_ny(); // Save the new holder
+
+        // Save the current hostName and unitGuid to local storage
+        if (tillfällig_namn && tillfällig_kommun && unitGuid) {
+            console.log(`Saving hostName: ${tillfällig_kommun}, unitGuid: ${unitGuid} for ${tillfällig_namn}`);
+            localStorage.setItem(`hostName-${tillfällig_namn}`, tillfällig_kommun);
+            localStorage.setItem(`unitGuid-${tillfällig_namn}`, unitGuid);
+            
+            fetchWithThrottle(tillfällig_namn);
+        } else {
+            console.error('Missing data to save hostName or unitGuid');
+        }
     }, 0);
 });
+
 
 function ny_sal() {
     add_screen.style.display = "flex";
@@ -170,15 +182,32 @@ function skola_vald(schoolUnitGuid) {
 }
 
 function spara_ny() {
+    console.log(`spara_ny() called with tillfällig_namn: ${namnVal.value}`);
     geNamn.style.display = "none";
     add_screen.style.display = "none";
     let tillfällig_namn = namnVal.value; // Define the temporary name
     namnVal.value = "";
+
+    if (!tillfällig_namn) {
+        alert('Sal Namn cannot be empty');
+        return;
+    }
+
+    // Save holder
     saveHolder(tillfällig_namn);
 
-    setTimeout(() => {
-        fetchTimetableDataAfterSave(tillfällig_namn); // Pass the name as a parameter
-    }, 0);
+    // Save the current parameters to local storage
+    if (tillfällig_kommun && unitGuid) {
+        console.log(`Saving hostName: ${tillfällig_kommun}, unitGuid: ${unitGuid} for ${tillfällig_namn}`);
+        localStorage.setItem(`hostName-${tillfällig_namn}`, tillfällig_kommun);
+        localStorage.setItem(`unitGuid-${tillfällig_namn}`, unitGuid);
+        localStorage.setItem(`schemaID-${tillfällig_namn}`, salVald); // Store schemaID
+
+        // Fetch timetable data after saving
+        fetchTimetableDataAfterSave(tillfällig_namn);
+    } else {
+        console.error('Missing data to save hostName or unitGuid');
+    }
 }
 
 async function fetch_skolor(salVald) {
@@ -278,9 +307,11 @@ function createHolderElement(holder) {
         <p class="remove_sal" style="cursor: pointer;">X</p>
         <p class="sal_namn">${holder.sal_namn}</p>
         <p class="status">${holder.status || 'Är ledig'}</p>
+        <p class="countdown">00:00:00</p> <!-- Countdown element -->
         <p class="tid">${holder.tid || '00:00:00'}</p>
         <p class="lärare">${holder.lärare || 'JANNE'}</p>
         <p class="ämne">${holder.ämne || 'CAD'}</p>
+
     `;
 
     // Add click event listener to the remove button
@@ -311,6 +342,7 @@ function renderHolders() {
 
     holders.forEach(holder => {
         container.appendChild(createHolderElement(holder));
+        fetchTimetableDataAfterSave(holder); // Fetch timetable data for each holder
     });
 }
 
@@ -324,6 +356,9 @@ function saveHolder(tillfällig_namn) {
     const newHolder = {
         id: holderId++, // Unique identifier
         sal_namn: tillfällig_namn,
+        hostName: tillfällig_kommun,
+        schemaID: salVald,
+        unitGuid: unitGuid,
         status: 'Är ledig', // Default value, can be customized
         tid: '00:00:00', // Default value, can be customized
         lärare: 'JANNE', // Default value, can be customized
@@ -333,21 +368,47 @@ function saveHolder(tillfällig_namn) {
     holders.push(newHolder);
     localStorage.setItem('holders', JSON.stringify(holders)); // Store in localStorage
     renderHolders(); // Re-render holders
-
-    // Fetch timetable data after saving
-    fetchTimetableDataAfterSave(tillfällig_namn);
+    fetchTimetableDataAfterSave(newHolder); // Pass the holder object to fetch data
 }
 
+
 // Render holders on page load
-document.addEventListener('DOMContentLoaded', renderHolders);
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded event fired');
+    holders.forEach(holder => {
+        console.log(`Processing holder with name: ${holder.sal_namn}`);
+        if (holder.sal_namn) {
+            const savedHostName = localStorage.getItem(`hostName-${holder.sal_namn}`);
+            const savedUnitGuid = localStorage.getItem(`unitGuid-${holder.sal_namn}`);
+            const savedSchemaID = localStorage.getItem(`schemaID-${holder.sal_namn}`);
+
+            console.log(`Retrieved hostName: ${savedHostName}, unitGuid: ${savedUnitGuid} for ${holder.sal_namn}`);
+
+            if (savedHostName && savedUnitGuid && savedSchemaID) {
+                fetchTimetableDataAfterSave(holder.sal_namn);
+            } else {
+                console.error(`Missing hostName, unitGuid, or schemaID for ${holder.sal_namn}`);
+            }
+        }
+    });
+});
 
 // Fetch timetable data after saving
-async function fetchTimetableDataAfterSave(tillfällig_namn) {
+async function fetchTimetableDataAfterSave(tillfällig_namn, shouldUpdate = true) {
     try {
+        const savedHostName = localStorage.getItem(`hostName-${tillfällig_namn}`);
+        const savedUnitGuid = localStorage.getItem(`unitGuid-${tillfällig_namn}`);
+        const savedSchemaID = localStorage.getItem(`schemaID-${tillfällig_namn}`);
+
+        if (!savedHostName || !savedUnitGuid || !savedSchemaID) {
+            console.error('Missing data to fetch timetable');
+            return;
+        }
+
         const response = await fetch("https://different-jealous-silica.glitch.me/api/timetable", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hostName: tillfällig_kommun, schemaID: salVald, unitGuid: unitGuid })
+            body: JSON.stringify({ hostName: savedHostName, schemaID: savedSchemaID, unitGuid: savedUnitGuid })
         });
 
         if (!response.ok) {
@@ -359,9 +420,12 @@ async function fetchTimetableDataAfterSave(tillfällig_namn) {
         const timetableData = await response.json();
         document.getElementById("timetableData").textContent = JSON.stringify(timetableData, null, 2);
 
-        // Update holders with timetable data and start countdowns
-        mapTimetableToHolder(timetableData, tillfällig_namn);
-        timetableData.forEach(lesson => startCountdown(lesson));
+        if (shouldUpdate) {
+            mapTimetableToHolder(timetableData, tillfällig_namn);
+            timetableData.forEach(lesson => startCountdown(lesson));
+        } else {
+            localStorage.setItem(`timetableData-${tillfällig_namn}`, JSON.stringify(timetableData));
+        }
     } catch (error) {
         console.error("Error fetching timetable data:", error);
         alert("An error occurred while fetching timetable data.");
@@ -374,10 +438,13 @@ function updateHolderWithLessonData(holder, lesson) {
     holder.tid = lesson.timeStart;
     holder.lärare = lesson.texts[0]; // Assuming this is the teacher
     holder.ämne = lesson.texts[1]; // Assuming this is the subject
-    // Update local storage
+    // Update local storage with the modified holder
+    const holderIndex = holders.findIndex(h => h.id === holder.id);
+    holders[holderIndex] = holder;
     localStorage.setItem('holders', JSON.stringify(holders));
     renderHolders(); // Refresh display
 }
+
 
 // Map timetable data to holders
 function mapTimetableToHolder(timetableData, tillfällig_namn) {
@@ -483,3 +550,21 @@ const lessons = [
 
 const closestLesson = findClosestLesson(lessons);
 console.log(closestLesson);
+
+let lastFetchTime = 0;
+const FETCH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+async function fetchWithThrottle(tillfällig_namn) {
+    if (!tillfällig_namn) {
+        console.log('No timetable name provided, skipping fetch.');
+        return;
+    }
+
+    const now = Date.now();
+    if (now - lastFetchTime < FETCH_INTERVAL) {
+        console.log('Fetch throttled');
+        return; // Skip fetch if called too soon
+    }
+    lastFetchTime = now;
+    await fetchTimetableDataAfterSave(tillfällig_namn);
+}
