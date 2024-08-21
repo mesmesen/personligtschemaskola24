@@ -664,9 +664,12 @@ function logHolderInfo(holder) {
 
 // Example usage
 const holder = {
-    sal_namn: "John Doe",
+    sal_namn: "Din mamma",
     lessonStartTime: "03:40:36",
     lessonEndTime: "13:33:42",
     lessonDayOfWeek: 3 // Wednesday
 };
 logHolderInfo(holder);
+
+//måste lägga till med tiem remaining typ att om det är mer en en vecka elelr liksom att det inte finnsnågon
+// tills dag 1 igen så säger den Nästa vecka istället typ aaa!
