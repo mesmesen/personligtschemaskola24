@@ -33,11 +33,11 @@ document.getElementById("initialForm").addEventListener("submit", async (event) 
 
             document.getElementById("schoolSelection").style.display = "block";
         } else {
-            alert(data.message);
+            console.log(data.message);
         }
     } catch (error) {
         console.error("Error fetching schools:", error);
-        alert("An error occurred while fetching schools.");
+        console.log("An error occurred while fetching schools.");
     }
 });
 
@@ -60,11 +60,11 @@ document.getElementById("fetchTimetable").addEventListener("click", async () => 
             document.getElementById("timetableData").textContent = JSON.stringify(timetableData, null, 2);
             document.getElementById("timetable").style.display = "block";
         } else {
-            alert(timetableData.message);
+            console.log(timetableData.message);
         }
     } catch (error) {
         console.error("Error fetching timetable:", error);
-        alert("An error occurred while fetching the timetable.");
+        console.log("An error occurred while fetching the timetable.");
     }
 });
 
@@ -145,6 +145,7 @@ document.getElementById("spara").addEventListener("click", () => {
 function ny_sal() {
     add_screen.style.display = "flex";
     search_name.style.display = "flex";
+    black_back.style.display = "block";
 }
 
 function exit_1() {
@@ -153,6 +154,7 @@ function exit_1() {
     id_val.style.display = "none";
     searchInput.value = '';
     salen.value = "";
+    black_back.style.display = "none";
 }
 
 function kommun_vald() {
@@ -185,11 +187,12 @@ function spara_ny() {
     console.log(`spara_ny() called with tillfällig_namn: ${namnVal.value}`);
     geNamn.style.display = "none";
     add_screen.style.display = "none";
-    let tillfällig_namn = namnVal.value; // Define the temporary name
+    black_back.style.display = "none";
+    let tillfällig_namn = namnVal.value; // Define this before using it in the setTimeout function
     namnVal.value = "";
 
     if (!tillfällig_namn) {
-        alert('Sal Namn cannot be empty');
+        console.log('Sal Namn cannot be empty');
         return;
     }
 
@@ -204,7 +207,9 @@ function spara_ny() {
         localStorage.setItem(`schemaID-${tillfällig_namn}`, salVald); // Store schemaID
 
         // Fetch timetable data after saving
-        fetchTimetableDataAfterSave(tillfällig_namn);
+        setTimeout(() => {
+            fetchTimetableDataAfterSave(tillfällig_namn);
+        }, 0);
     } else {
         console.error('Missing data to save hostName or unitGuid');
     }
@@ -224,7 +229,7 @@ async function fetch_skolor(salVald) {
 
         if (!response.ok) {
             const errorData = await response.json();
-            alert(errorData.message);
+            console.log(errorData.message);
             return;
         }
 
@@ -236,7 +241,7 @@ async function fetch_skolor(salVald) {
         displaySchools(data);
     } catch (error) {
         console.error("Error fetching data:", error);
-        alert("An error occurred while fetching data.");
+        console.log("An error occurred while fetching data.");
     }
 }
 
@@ -274,7 +279,7 @@ function displaySchools(schools) {
     });
 }
 
-
+const black_back = document.getElementById("black_back"); 
 
 
 
@@ -299,7 +304,6 @@ let holderId = holders.length > 0 ? holders[holders.length - 1].id + 1 : 0; // I
 
 // Function to create a new holder element
 function createHolderElement(holder) {
-    // Ensure the holder object has the expected properties
     if (!holder) {
         console.error('Holder is undefined');
         return;
@@ -307,38 +311,56 @@ function createHolderElement(holder) {
 
     const holderDiv = document.createElement('div');
     holderDiv.className = 'holder';
-    holderDiv.dataset.id = holder.id; // Assign the holder's id to the dataset for easy reference
+    holderDiv.dataset.id = holder.id;
 
     holderDiv.innerHTML = `
+        <div class="singel_hold">
         <p class="remove_sal" style="cursor: pointer;">X</p>
         <p class="sal_namn">${holder.sal_namn || 'Unnamed Holder'}</p>
         <p class="status">${holder.status || 'Är ledig'}</p>
-        <p class="countdown">00:00:00</p> <!-- Countdown element -->
+        <div class=klocka>
+        <p class="tid_kvar">Tid Kvar: </p>
+        <p class="countdown" id="countdown-${holder.id}">00:00:00</p>
+        </div>
+        <div class=tills>
+        <p class="tid_kvar">Tills: </p>
         <p class="tid">${holder.tid || '00:00:00'}</p>
-        <p class="lärare">${holder.lärare || 'JANNE'}</p>
+        </div>
+        <div class=lek_info>
+        <p class="lärare">${holder.lärare + "," || 'JANNE'}</p>
         <p class="ämne">${holder.ämne || 'CAD'}</p>
+        </div>
+        </div>
     `;
 
-    // Add click event listener to the remove button
     const removeButton = holderDiv.querySelector('.remove_sal');
     removeButton.addEventListener('click', function() {
-        removeHolder(holder.id); // Pass the id of the holder to remove
+        removeHolder(holder.id);
     });
-
-    logHolderInfo(holder); // Log the holder's info to the console
 
     return holderDiv;
 }
 
 // Function to remove a holder
 function removeHolder(id) {
-    // Remove the holder with the specified id from the holders array
+    // Remove the holder from the holders array
     holders = holders.filter(holder => holder.id !== id);
 
-    // Update localStorage
+    // Remove holder data from local storage
+    const holderToRemove = holders.find(holder => holder.id === id);
+    if (holderToRemove) {
+        const { sal_namn } = holderToRemove;
+        
+        localStorage.removeItem(`hostName-${sal_namn}`);
+        localStorage.removeItem(`unitGuid-${sal_namn}`);
+        localStorage.removeItem(`schemaID-${sal_namn}`);
+        localStorage.removeItem(`timetableData-${sal_namn}`);
+    }
+
+    // Update local storage with the new holders array
     localStorage.setItem('holders', JSON.stringify(holders));
 
-    // Re-render the holders
+    // Re-render holders
     renderHolders();
 }
 
@@ -348,11 +370,11 @@ function renderHolders() {
     container.innerHTML = ''; // Clear existing content
 
     holders.forEach(holder => {
-        container.appendChild(createHolderElement(holder));
-        fetchTimetableDataAfterSave(holder); // Fetch timetable data for each holder
+        const holderElement = createHolderElement(holder);
+        container.appendChild(holderElement);
+        startCountdownForHolder(holder); // Start the countdown for each holder
     });
 }
-
 // Function to save a new holder
 function saveHolder(tillfällig_namn) {
     if (!tillfällig_namn) {
@@ -360,7 +382,6 @@ function saveHolder(tillfällig_namn) {
         return;
     }
 
-    // Create a new holder with default values
     const newHolder = {
         id: holderId++, // Unique identifier
         sal_namn: tillfällig_namn,
@@ -377,33 +398,28 @@ function saveHolder(tillfällig_namn) {
     };
 
     holders.push(newHolder);
-    localStorage.setItem('holders', JSON.stringify(holders)); // Store in localStorage
+    localStorage.setItem('holders', JSON.stringify(holders));
     renderHolders(); // Re-render holders
-    fetchTimetableDataAfterSave(newHolder.sal_namn); // Pass the holder name to fetch data
+    fetchTimetableDataAfterSave(newHolder.sal_namn); // Fetch timetable data for the new holder
 }
 
 
 // Render holders on page load
 document.addEventListener('DOMContentLoaded', () => {
-    getLocalDayOfWeek()
-    getLocalTime()
-    console.log('DOMContentLoaded event fired');
-    holders.forEach(holder => {
-        console.log(`Processing holder with name: ${holder.sal_namn}`);
-        if (holder.sal_namn) {
-            const savedHostName = localStorage.getItem(`hostName-${holder.sal_namn}`);
-            const savedUnitGuid = localStorage.getItem(`unitGuid-${holder.sal_namn}`);
-            const savedSchemaID = localStorage.getItem(`schemaID-${holder.sal_namn}`);
-
-            console.log(`Retrieved hostName: ${savedHostName}, unitGuid: ${savedUnitGuid} for ${holder.sal_namn}`);
-
-            if (savedHostName && savedUnitGuid && savedSchemaID) {
-                fetchTimetableDataAfterSave(holder.sal_namn);
-            } else {
-                console.error(`Missing hostName, unitGuid, or schemaID for ${holder.sal_namn}`);
+    function initializeAndRender() {
+        holders.forEach(holder => {
+            if (holder.sal_namn) {
+                fetchTimetableDataAfterSave(holder.sal_namn, false); // Load data without updating UI
             }
-        }
-    });
+        });
+        renderHolders();
+    }
+
+    // Call the function initially when the page loads
+    initializeAndRender();
+
+    // Set up a timer to call the function every 5 minutes
+    setInterval(initializeAndRender, 300000); // 300000 milliseconds = 5 minutes
 });
 
 // Fetch timetable data after saving
@@ -426,7 +442,7 @@ async function fetchTimetableDataAfterSave(tillfällig_namn, shouldUpdate = true
 
         if (!response.ok) {
             const errorData = await response.json();
-            alert(errorData.message);
+            console.log(errorData.message);
             return;
         }
 
@@ -435,13 +451,12 @@ async function fetchTimetableDataAfterSave(tillfällig_namn, shouldUpdate = true
 
         if (shouldUpdate) {
             mapTimetableToHolder(timetableData, tillfällig_namn);
-            timetableData.forEach(lesson => startCountdown(lesson));
         } else {
             localStorage.setItem(`timetableData-${tillfällig_namn}`, JSON.stringify(timetableData));
         }
     } catch (error) {
         console.error("Error fetching timetable data:", error);
-        alert("An error occurred while fetching timetable data.");
+        console.log("An error occurred while fetching timetable data.");
     }
 }
 
@@ -451,15 +466,14 @@ function updateHolderWithLessonData(holder, lesson) {
     holder.tid = lesson.timeStart;
     holder.lärare = lesson.texts[0]; // Assuming this is the teacher
     holder.ämne = lesson.texts[1]; // Assuming this is the subject
-    holder.lessonStartTime = lesson.timeStart; // Save lesson start time
-    holder.lessonEndTime = lesson.timeEnd; // Save lesson end time
-    holder.lessonDayOfWeek = lesson.dayOfWeekNumber; // Save day of the week
+    holder.lessonStartTime = lesson.timeStart;
+    holder.lessonEndTime = lesson.timeEnd;
+    holder.lessonDayOfWeek = lesson.dayOfWeekNumber;
 
-    // Update local storage with the modified holder
     const holderIndex = holders.findIndex(h => h.id === holder.id);
     holders[holderIndex] = holder;
     localStorage.setItem('holders', JSON.stringify(holders));
-    renderHolders(); // Refresh display
+    renderHolders();
 }
 
 
@@ -468,11 +482,11 @@ function mapTimetableToHolder(timetableData, tillfällig_namn) {
     const holder = holders.find(h => h.sal_namn === tillfällig_namn);
     if (!holder) return;
 
-    // Find the closest future lesson
     const closestLesson = findClosestLesson(timetableData);
 
     if (closestLesson) {
         updateHolderWithLessonData(holder, closestLesson);
+        startCountdownForHolder(holder);
     } else {
         console.error('No future lessons found.');
     }
@@ -481,19 +495,19 @@ function mapTimetableToHolder(timetableData, tillfällig_namn) {
 // Calculate and display lesson status
 function getLessonStatus(lesson) {
     const now = new Date();
-    const currentTime = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+    const currentTime = now.toTimeString().split(' ')[0];
 
     const lessonStart = new Date(`1970-01-01T${lesson.timeStart}Z`);
     const lessonEnd = new Date(`1970-01-01T${lesson.timeEnd}Z`);
     const current = new Date(`1970-01-01T${currentTime}Z`);
 
     if (current < lessonStart) {
-        return 'ledig'; // Lesson hasn't started yet
+        return 'ledig';
     }
     if (current >= lessonStart && current <= lessonEnd) {
-        return 'upptagen'; // Lesson is currently ongoing
+        return 'upptagen';
     }
-    return 'ledig'; // Lesson has ended or is not yet relevant
+    return 'ledig';
 }
 
 // Calculate time remaining for countdown
@@ -501,9 +515,13 @@ function calculateTimeRemaining(endTime) {
     const now = new Date();
     const end = new Date(`1970-01-01T${endTime}Z`);
     const timeDiff = end - now;
+
+    if (timeDiff <= 0) return { hours: 0, minutes: 0, seconds: 0 };
+
     const hours = Math.floor(timeDiff / (1000 * 60 * 60));
     const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
     return { hours, minutes, seconds };
 }
 
@@ -616,50 +634,48 @@ function secondsToTime(seconds) {
 
 // Function to log holder information and calculate time-related info
 function logHolderInfo(holder) {
+    const countdownElement = document.getElementById(`countdown-${holder.id}`);
+    if (!countdownElement) {
+        console.error(`Countdown element not found for holder id: ${holder.id}`);
+        return;
+    }
+
+    function updateCountdown() {
+        const timeLeft = calculateTimeLeft(holder);
+        if (timeLeft) {
+            countdownElement.textContent = secondsToTime(timeLeft.seconds);
+            if (timeLeft.seconds <= 0) {
+                clearInterval(timerInterval);
+                countdownElement.textContent = "Time's up!";
+            }
+        } else {
+            countdownElement.textContent = "No upcoming lessons.";
+        }
+    }
+
+    updateCountdown(); // Initial call
+    const timerInterval = setInterval(updateCountdown, 1000); // Update every second
+}
+
+function calculateTimeLeft(holder) {
     const localDayOfWeek = getLocalDayOfWeek();
     const localTime = getLocalTime();
 
-    console.log(`Holder Name: ${holder.sal_namn}`);
-    console.log(`Lesson Start Time: ${holder.lessonStartTime}`);
-    console.log(`Lesson End Time: ${holder.lessonEndTime}`);
-    console.log(`Lesson Day of Week: ${holder.lessonDayOfWeek}`);
-    console.log(`User's Local Day of Week: ${localDayOfWeek}`);
-    console.log(`User's Local Time: ${localTime}`);
-
-    const time1 = holder.lessonStartTime;
-    const time2 = holder.lessonEndTime;
-    const time3 = localTime;
-
-    const seconds1 = timeToSeconds(time1);
-    const seconds2 = timeToSeconds(time2);
-    const seconds3 = timeToSeconds(time3);
-
-    // Helper to convert day difference to seconds
-    function dayDifferenceInSeconds(day1, day2) {
-        return (day2 - day1) * 24 * 3600;
-    }
+    const lessonStartSeconds = timeToSeconds(holder.lessonStartTime);
+    const lessonEndSeconds = timeToSeconds(holder.lessonEndTime);
+    const currentSeconds = timeToSeconds(localTime);
 
     if (localDayOfWeek === holder.lessonDayOfWeek) {
-        if (seconds3 >= seconds1 && seconds3 <= seconds2) {
-            // Calculate time left until the lesson ends
-            const timeLeft = seconds2 - seconds3;
-            console.log(`Time left until the lesson ends: ${secondsToTime(timeLeft)}`);
-        } else if (seconds3 < seconds1) {
-            // Calculate time left until the lesson starts
-            const timeUntilStart = seconds1 - seconds3;
-            console.log(`Time left until the lesson starts: ${secondsToTime(timeUntilStart)}`);
+        if (currentSeconds < lessonStartSeconds) {
+            return { seconds: lessonStartSeconds - currentSeconds, type: "start" };
+        } else if (currentSeconds >= lessonStartSeconds && currentSeconds <= lessonEndSeconds) {
+            return { seconds: lessonEndSeconds - currentSeconds, type: "end" };
         }
     } else if (localDayOfWeek < holder.lessonDayOfWeek) {
-        // Lesson starts on a future day
-        const timeUntilStart = (dayDifferenceInSeconds(localDayOfWeek, holder.lessonDayOfWeek)) + (seconds1 - seconds3);
-        console.log(`Time left until the lesson starts: ${secondsToTime(timeUntilStart)}`);
-    } else if (localDayOfWeek > holder.lessonDayOfWeek) {
-        // Lesson is on a past day
-        const timeSinceEnd = (dayDifferenceInSeconds(holder.lessonDayOfWeek, localDayOfWeek)) + (seconds3 - seconds2);
-        console.log(`Time since the lesson ended: ${secondsToTime(timeSinceEnd)}`);
-    } else {
-        console.log('The lesson is not within the current time frame.');
+        const timeUntilStart = ((holder.lessonDayOfWeek - localDayOfWeek) * 86400) + (lessonStartSeconds - currentSeconds);
+        return { seconds: timeUntilStart, type: "start" };
     }
+    return null;
 }
 
 // Example usage
@@ -670,6 +686,31 @@ const holder = {
     lessonDayOfWeek: 3 // Wednesday
 };
 logHolderInfo(holder);
+
+
+function startCountdownForHolder(holder) {
+    const countdownElement = document.getElementById(`countdown-${holder.id}`);
+    if (!countdownElement) {
+        console.error(`Countdown element not found for holder id: ${holder.id}`);
+        return;
+    }
+
+    function updateCountdown() {
+        const timeLeft = calculateTimeLeft(holder);
+        if (timeLeft) {
+            countdownElement.textContent = secondsToTime(timeLeft.seconds);
+            if (timeLeft.seconds <= 0) {
+                clearInterval(timerInterval);
+                countdownElement.textContent = "Time's up!";
+            }
+        } else {
+            countdownElement.textContent = "No upcoming lessons.";
+        }
+    }
+
+    updateCountdown(); // Initial call
+    const timerInterval = setInterval(updateCountdown, 1000); // Update every second
+}
 
 //måste lägga till med tiem remaining typ att om det är mer en en vecka elelr liksom att det inte finnsnågon
 // tills dag 1 igen så säger den Nästa vecka istället typ aaa!

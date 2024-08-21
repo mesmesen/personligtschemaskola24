@@ -50,6 +50,11 @@
     border:black 5px solid;
     border-radius: 20px;
     display:none;
+    position: absolute; /* Take the element out of normal document flow */
+    top: 50%; /* Position from the top of the viewport */
+    left: 50%; /* Position from the left of the viewport */
+    transform: translate(-50%, -50%);
+    z-index: 100;
 }
 
 .exit1{
@@ -259,4 +264,115 @@
 }
 .spara:hover{
     scale: 1.05;
+}
+
+.singel_hold{
+    background-color: rgb(44, 44, 44);
+    position: relative;
+    width: 210px;
+    border-radius: 20px;
+    border:black solid 3px;
+    margin-top: 10px;
+    margin-left: 4px;
+}
+
+.remove_sal{
+    background-color: red;
+    font-family: sans-serif;
+    font-weight: bold;
+    width: 23px;
+    font-size: 20px;
+    text-align: center;
+    border-radius: 100px;
+    border:solid black 3px;
+    margin: 0;
+    position:absolute;
+    left: 176px;
+    top:5px;
+}
+.sal_namn{
+    color:white;
+    font-size: 22px;
+    margin: 0;
+    text-align: center;
+    margin-top: 10px;
+    text-decoration: underline;
+}
+.status{
+    color:white;
+    font-size: 26px;
+    background-color: rgb(0, 175, 23);
+    width: 70px;
+    text-align: center;
+    margin: 0;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    margin-left: 65px;
+    border-radius: 20px;
+    padding: 5px;
+
+}
+
+.tid_kvar{
+    color:white;
+    font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    margin: 0;
+    margin-top: 10px;
+}
+.countdown{
+    color:white;
+    margin: 0;
+    font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    margin-left: 10px;
+    margin-top: 10px;
+    
+}
+
+.tid{
+    color:white;
+    font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    margin: 0;
+    margin-left: 38px; 
+    margin-top: 10px;
+}
+
+.lärare{
+    color:rgb(194, 194, 194);
+   
+}
+.ämne{
+    color:rgb(194, 194, 194);
+    margin-left: 6px;
+}
+
+
+.klocka{
+    display: flex;
+}
+.tills{
+    display: flex;
+}
+.lek_info{
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+}
+
+.black_back{
+    position: absolute;
+    top:0;
+    left:0;
+    width: 100%;
+    height: 100%;
+    z-index: 99;
+    background-color:rgba(0, 0, 0, 0.938);
+    display:none;
+}
+
+.bajsbajs{
+    display: none;
+}
+body{
+    margin-top: 100px;
+    margin-left: 100px;
 }
